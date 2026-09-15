@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Official ORS Word Guess</title>
+
+<style>
+  :root {
+    --green:#538d4e;
+    --yellow:#f2c94c;
+    --red:#b22234;
+    --tile:#1a1a2e;
+    --text:#ffffff;
+    --border:#0a1f44;
+    --tile-size:64px;
+  }
+  @media (max-width:480px){ :root{ --tile-size:48px; } }
+
+  body {
+    background: linear-gradient(180deg,#0a1f44 0%,#1c3faa 100%);
+    color: var(--text);
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    min-height:100vh;
+    margin:0;
+    text-align:center;
+  }
+
+  header {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    margin-bottom:20px;
+  }
+
+  h1 {
+    font-size:2.2rem;
+    font-weight:800;
+    text-transform:uppercase;
+    margin:0;
+    animation:pulse 2s infinite;
+  }
+  h1 span:first-child { color:#ffffff; display:block; }
+  h1 span:last-child { color:#b22234; display:block; }
+
+  @keyframes pulse {
+    50%{ transform:scale(1.05); }
+  }
+
+  .title-bar {
+    width:240px;
+    height:3px;
+    background:#ffffff;
+    margin-top:12px;
+    border-radius:6px;
+  }
+
+  main {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .board {
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin:20px 0;
+    align-items:center;
+  }
+
+  .row {
+    display:flex;
+    gap:8px;
+    justify-content:center;
+  }
+
+  .tile {
+    width:var(--tile-size);
+    height:var(--tile-size);
+    background:var(--tile);
+    border:2px solid var(--border);
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:calc(var(--tile-size)*0.45);
+    font-weight:700;
+    text-transform:uppercase;
+    color:#ffffff;
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.6);
+  }
+
+  .tile.correct { background:var(--green); border-color:var(--green); }
+  .tile.present { background:var(--yellow); border-color:var(--yellow); color:#ffffff; }
+  .tile.absent  { background:var(--red); border-color:var(--red); }
+
+  .message {
+    height:24px;
+    font-weight:600;
+    margin-top:5px;
+  }
+
+  .btn {
+    margin-top:12px;
+    padding:8px 18px;
+    background:#b22234;
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    font-weight:700;
+    cursor:pointer;
+  }
+
+  .keyboard {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(28px,1fr));
+    gap:5px;
+    max-width:360px;
+    margin:20px auto 0;
+  }
+
+  .key {
+    background:#0a1f44;
+    color:#ffffff;
+    font-weight:bold;
+    padding:8px;
+    border-radius:6px;
+    text-transform:uppercase;
+  }
+
+  footer {
+    margin-top:20px;
+    font-size:12px;
+    color:#d6d6d6;
+    text-align:center;
+  }
+
+  #hiddenInput {
+    position:absolute;
+    top:-100px;
+    opacity:0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>Official ORS</span><span>Word Guess</span></h1>
+  <div class="title-bar"></div>
+</header>
+
+<main>
+  <div class="board" id="board"></div>
+  <div class="message" id="message"></div>
+  <button id="restartBtn" class="btn" style="display:none;">Play Again</button>
+  <div id="keyboard" class="keyboard"></div>
+  <input id="hiddenInput" type="text" autocapitalize="characters" />
+</main>
+
+<footer>© 2026 Official ORS Games</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<script>
+const SECRET="CABIN";
+const ROWS=6,COLS=SECRET.length;
+let r=0,c=0,over=false;
+
+const board=document.getElementById("board");
+const msg=document.getElementById("message");
+const btn=document.getElementById("restartBtn");
+const input=document.getElementById("hiddenInput");
+const kb=document.getElementById("keyboard");
+
+"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(l=>{
+  const k=document.createElement("div");
+  k.className="key";
+  k.textContent=l;
+  kb.appendChild(k);
+});
+
+for(let i=0;i<ROWS;i++){
+  const row=document.createElement("div");
+  row.className="row";
+  for(let j=0;j<COLS;j++){
+    const t=document.createElement("div");
+    t.className="tile";
+    t.id=`t${i}${j}`;
+    row.appendChild(t);
+  }
+  board.appendChild(row);
+}
+
+input.addEventListener("keydown",e=>{
+  if(over)return;
+  if(e.key==="Backspace"&&c>0){
+    c--;
+    document.getElementById(`t${r}${c}`).textContent="";
+  }
+  if(e.key==="Enter")check();
+});
+
+input.addEventListener("input",e=>{
+  if(over)return;
+  const v=e.target.value.slice(-1);
+  e.target.value="";
+  if(/[a-z]/i.test(v)&&c<COLS){
+    document.getElementById(`t${r}${c}`).textContent=v.toUpperCase();
+    c++;
+  }
+});
+
+function check(){
+  let g=[...Array(COLS)].map((_,i)=>document.getElementById(`t${r}${i}`).textContent).join("");
+  if(g.length<COLS){msg.textContent="Not enough letters";return;}
+
+  let s=SECRET.split("");
+  let res=Array(COLS).fill("absent");
+
+  [...g].forEach((l,i)=>{
+    if(l===s[i]){
+      res[i]="correct";
+      s[i]=null;
+    }
+  });
+
+  [...g].forEach((l,i)=>{
+    if(res[i]==="absent"&&s.includes(l)){
+      res[i]="present";
+      s[s.indexOf(l)]=null;
+    }
+  });
+
+  res.forEach((f,i)=>{
+    document.getElementById(`t${r}${i}`).classList.add(f);
+  });
+
+  if(g===SECRET){
+    msg.textContent="🇺🇸 You got it!";
+    fire();
+    over=true;
+    btn.style.display="block";
+    return;
+  }
+
+  r++; c=0;
+  if(r>=ROWS){
+    msg.textContent=`Word was ${SECRET}`;
+    over=true;
+    btn.style.display="block";
+  }
+}
+
+function fire(){
+  const end=Date.now()+2000;
+  (function f(){
+    confetti({particleCount:6,spread:55,origin:{x:0},colors:['#b22234','#ffffff','#1c3faa']});
+    confetti({particleCount:6,spread:55,origin:{x:1},colors:['#b22234','#ffffff','#1c3faa']});
+    if(Date.now()<end)requestAnimationFrame(f);
+  })();
+}
+
+btn.onclick=()=>location.reload();
+window.onload=()=>input.focus();
+document.body.addEventListener("click",()=>input.focus());
+</script>
+
+</body>
+</html>
